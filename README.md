@@ -8,8 +8,7 @@ Ledger is an open-source, resilient software edge layer designed to sit between 
 
 It deliberately decouples **hardware translation** from **data intelligence**, allowing you to use cheap, off-the-shelf, vendor-neutral hardware while handling device profiles, network resilience, and data normalization entirely in software.
 
-*(Note for Portfolio: Insert a GIF or screenshot of the dark-mode dashboard here)*
-`![Ledger Dashboard](docs/assets/dashboard_preview.png)`
+![Ledger Dashboard](docs/assets/dashboard_preview.png)
 
 ---
 
@@ -24,8 +23,7 @@ Most industrial IoT integrations rely on expensive, proprietary edge gateways (e
 
 Ledger solves this by pushing the intelligence to a local software layer (running on an Edge PC, Raspberry Pi, or Industrial IPC) and treating the hardware as disposable.
 
-*(Note for Portfolio: Insert your Altium Schematic here)*
-`![Architecture Schematic](docs/wiring_schematic_v4.png)`
+![Architecture Schematic](docs/wiring_schematic_v4.png)
 
 1. **Dumb Hardware:** We use inexpensive, vendor-neutral Serial-to-Ethernet servers (like the USR-DR404) simply to convert RS-485 electrical signals to TCP packets.
 2. **Smart Software (Ledger):** The Python-based Edge Engine polls the raw registers, normalizes them into engineering units using human-readable YAML profiles, and publishes them as clean JSON.
