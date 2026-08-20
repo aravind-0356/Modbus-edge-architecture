@@ -27,7 +27,7 @@ Ledger solves this by pushing the intelligence to a local software layer (runnin
 *(Note for Portfolio: Insert your Altium Schematic here)*
 `![Architecture Schematic](docs/wiring_schematic_v4.png)`
 
-1. **Dumb Hardware:** We use ultra-cheap, vendor-neutral Serial-to-Ethernet servers (like the USR-DR404) simply to convert RS-485 electrical signals to TCP packets.
+1. **Dumb Hardware:** We use inexpensive, vendor-neutral Serial-to-Ethernet servers (like the USR-DR404) simply to convert RS-485 electrical signals to TCP packets.
 2. **Smart Software (Ledger):** The Python-based Edge Engine polls the raw registers, normalizes them into engineering units using human-readable YAML profiles, and publishes them as clean JSON.
 3. **Store & Forward Resilience:** Every single reading is written to a local SQLite buffer **first**. If the cloud connection drops, polling continues and the local database fills up. Upon reconnection, Ledger replays the missing data to the cloud with the exact original timestamps. **Zero data loss.**
 
@@ -38,6 +38,8 @@ Ledger solves this by pushing the intelligence to a local software layer (runnin
 1. **Device Knowledge:** Turns raw, unlabeled register values into named, scaled, real-world quantities (`"voltage": 230.4, "unit": "V"`, not `"register_0": 2300`).
 2. **Multi-Vendor Normalization:** Multiple field devices from different manufacturers, each with a completely different register layout, byte order, and scaling convention, produce a single unified JSON output stream. 
 3. **Edge Anomaly Detection:** Threshold checks and immediate alerting run at the edge (`edge_rules.py`), catching physical anomalies (e.g., cavitation, blockages) before the data even reaches the cloud.
+4. **Hybrid Edge-to-Cloud Ready:** By simply updating the MQTT broker IP in the configuration, this system instantly routes normalized data to enterprise clouds like **AWS IoT Core**, **Azure IoT Hub**, or **HiveMQ Cloud**.
+5. **Globally Accessible Dashboard:** The included HTML/JS dashboard is a standalone static web app. It can run completely offline as a "Local HMI" on the factory floor, or be dragged and dropped into **AWS S3**, **Vercel**, or **GitHub Pages** for real-time global monitoring from any browser in the world.
 
 ---
 
