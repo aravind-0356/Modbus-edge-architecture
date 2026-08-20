@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ledger — Gateway Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    /* ─── Tokens ─────────────────────────────────────────────── */
+    :root {
+      --bg:       #ffffff;
+      --surf:     #f7f7f5;
+      --surf2:    #f0f0ee;
+      --bdr:      #e2e2de;
+      --bdr-sub:  #eaeae6;
+      --txt:      #1a1a1e;
+      --muted:    #6a6a78;
+      --dim:      #b0b0be;
+
+      --elec:     #9a7810;
+      --elec-dim: rgba(154,120,16,.07);
+      --proc:     #1f7060;
+      --proc-dim: rgba(31,112,96,.07);
+
+      --ok:       #1a8a38;
+      --fault:    #b03020;
+      --warn:     #9a6010;
+
+      --radius:   8px;
+      --mono:     'IBM Plex Mono', monospace;
+      --sans:     'IBM Plex Sans', system-ui, sans-serif;
+    }
+
+    [data-theme="dark"] {
+      --bg:       #0e0e10;
+      --surf:     #1a1a1e;
+      --surf2:    #252529;
+      --bdr:      #34343c;
+      --bdr-sub:  #2a2a30;
+      --txt:      #e8e8ec;
+      --muted:    #7a7a8c;
+      --dim:      #44444e;
+
+      --elec:     #c49a27;
+      --elec-dim: rgba(196,154,39,.12);
+      --proc:     #2a9180;
+      --proc-dim: rgba(42,145,128,.12);
+
+      --ok:       #2ea84a;
+      --fault:    #c44b2b;
+      --warn:     #b07020;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg); color: var(--txt);
+      font-family: var(--sans);
+      height: 100vh; display: flex; flex-direction: column;
+      overflow: hidden;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    /* ─── Header ─────────────────────────────────────────────── */
+    .hdr {
+      height: 50px; border-bottom: 1px solid var(--bdr);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; flex-shrink: 0; background: var(--bg);
+      transition: background 0.3s, border-color 0.3s;
+    }
+    .hdr-left { display: flex; align-items: center; gap: 12px; }
+    .hdr-icon {
+      width: 26px; height: 26px; background: var(--elec-dim);
+      border-radius: 6px; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .hdr-icon svg { stroke: var(--elec); display: block; }
+    .hdr-title { font-weight: 600; font-size: 14px; letter-spacing: -0.2px; color: var(--txt); }
+    .hdr-sep { color: var(--dim); margin: 0 2px; font-weight: 300; }
+    .hdr-sub { font-size: 13px; color: var(--muted); font-weight: 400; }
+
+    .hdr-right { display: flex; align-items: center; gap: 16px; font-size: 12px; }
+    
+    .theme-toggle { background: transparent; border: 1px solid var(--bdr); color: var(--muted); border-radius: 4px; padding: 3px 6px; cursor: pointer; display: flex; align-items: center; transition: 0.2s; font-size: 12px; }
+    .theme-toggle:hover { color: var(--txt); background: var(--surf2); border-color: var(--dim); }
+
+    #clock {
+      font-family: var(--mono); font-size: 12px; color: var(--muted);
+    }
+
+    .conn {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--muted);
+    }
+    .conn-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--dim);
+      transition: background .4s;
+      flex-shrink: 0;
+    }
+    .conn-dot.live  { background: var(--ok); }
+    .conn-dot.error { background: var(--fault); }
+    #conn-txt { transition: color .3s; }
+
+    .recorder {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      background: var(--surf2); border: 1px solid var(--bdr);
+      padding: 6px 10px; border-radius: 4px; font-family: var(--mono); font-size: 11px;
+      transition: border-color 0.3s, background 0.3s, color 0.3s;
+    }
+    .recorder.recording { border-color: rgba(176,48,32,0.4); background: rgba(176,48,32,0.04); }
+    .rec-btn {
+      background: transparent; border: none; color: var(--txt); cursor: pointer;
+      display: flex; align-items: center; gap: 6px; font-family: inherit; font-size: 11px; font-weight: 500;
+      padding: 0; outline: none; transition: color 0.3s;
+    }
+    .rec-btn:hover { color: var(--fault); }
+    .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); transition: background 0.3s; }
+    .recording .rec-dot { background: var(--fault); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.2; } 100% { opacity: 1; } }
+    .rec-timer { color: var(--muted); min-width: 54px; text-align: right; transition: color 0.3s; }
+
+    /* ─── Body layout ────────────────────────────────────────── */
+    .body {
+      display: flex; flex: 1; overflow: hidden;
+    }
+
+    /* ─── Left sidebar — device list ─────────────────────────── */
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      border-right: 1px solid var(--bdr);
+      background: var(--surf);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar-inner {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 14px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .sidebar-heading {
+      font-size: 11px; font-weight: 600; color: var(--dim);
+      letter-spacing: .06em; text-transform: uppercase;
+      padding: 0 4px; margin-bottom: 2px; flex-shrink: 0;
+    }
+
+    /* Device card */
+    .dev-card {
+      background: var(--surf2);
+      border: 1px solid var(--bdr-sub);
+      border-radius: var(--radius);
+      overflow: hidden;
+      position: relative;
+    }
+    .dev-card-head {
+      padding: 10px 12px 8px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--bdr-sub);
+    }
+    .dev-card-name {
+      font-size: 12px; font-weight: 600; color: var(--txt);
+      display: flex; align-items: center; gap: 7px;
+    }
+    .dev-status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--ok); flex-shrink: 0;
+    }
+    .dev-age {
+      font-family: var(--mono); font-size: 10px; color: var(--dim);
+    }
+
+    .dev-fields {
+      padding: 8px 12px 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 8px;
+    }
+    .field-cell { 
+      display: flex; flex-direction: column; gap: 1px;
+      background: var(--bg); border: 1px solid var(--bdr);
+      border-radius: var(--radius); padding: 10px;
+      position: relative; overflow: hidden;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    .f-hdr { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; }
+    .f-name { font-size: 11px; color: var(--muted); text-transform: capitalize; }
+    .f-val { font-family: var(--mono); font-size: 15px; font-weight: 500; transition: color 0.25s; }
+    .f-val.is-alert { color: var(--fault); }
+    .f-val.changed  { color: var(--elec); }
+    .f-unit { font-size: 10px; color: var(--muted); margin-left: 2px; }
+    .f-minmax { font-size: 10px; color: var(--dim); margin-top: 4px; font-family: var(--mono); letter-spacing: -0.5px; display: flex; justify-content: space-between; }
+    
+    .snap-btn {
+      background: none; border: none; cursor: pointer; padding: 0; margin-left: auto;
+      color: var(--muted); font-size: 12px; opacity: 0; transition: opacity 0.2s, filter 0.2s; filter: grayscale(1);
+    }
+    .field-cell:hover .snap-btn { opacity: 0.6; }
+    .snap-btn:hover { filter: grayscale(0) drop-shadow(0 0 2px var(--elec)); opacity: 1; }
+    
+    .sb-tools { padding: 12px; border-top: 1px solid var(--bdr); display: flex; flex-direction: column; gap: 8px; background: var(--surf); transition: background 0.3s, border-color 0.3s; }
+    
+    /* Sweeper animation */
+    .dev-card::after {
+      content: ""; position: absolute; top: 0; bottom: 0; left: -10px; width: 2px;
+      background: linear-gradient(90deg, transparent, var(--elec), transparent);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: none;
+    }
+    .dev-card.sweeping::after {
+      transform: scaleX(1);
+      transition: transform .5s cubic-bezier(.22,1,.36,1);
+    }
+
+    .sidebar-empty {
+      font-size: 12px; color: var(--dim);
+      text-align: center; padding: 32px 16px;
+    }
+
+    /* ─── Right — charts + alerts ─────────────────────────────── */
+    .main {
+      flex: 1;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .chart-pane {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-bottom: 1px solid var(--bdr);
+      overflow: hidden;
+    }
+    .chart-cell {
+      display: flex; flex-direction: column;
+      padding: 18px 20px;
+      overflow: hidden;
+    }
+    .chart-cell + .chart-cell {
+      border-left: 1px solid var(--bdr);
+    }
+
+    .chart-hd {
+      display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px;
+      flex-shrink: 0;
+    }
+    .chart-title { font-size: 13px; font-weight: 600; color: var(--txt); }
+    .chart-group-tag {
+      font-size: 10px; color: var(--muted);
+      border: 1px solid var(--bdr);
+      border-radius: 3px; padding: 1px 5px;
+    }
+
+    .chart-wrap {
+      flex: 1; position: relative; min-height: 0;
+    }
+    canvas { width: 100% !important; height: 100% !important; }
+
+    .chart-empty {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 8px; color: var(--dim); font-size: 12px;
+    }
+    .chart-empty-spin {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 1.5px solid var(--bdr-sub);
+      border-top-color: var(--muted);
+      animation: spin .9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Alert strip ─────────────────────────────────────────── */
+    .alert-strip {
+      height: 130px; flex-shrink: 0;
+      background: var(--surf);
+      border-top: 1px solid var(--bdr);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .alert-hd {
+      padding: 8px 20px;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid var(--bdr);
+      flex-shrink: 0;
+    }
+    .alert-hd-title { font-size: 12px; font-weight: 600; color: var(--muted); }
+    .alert-count {
+      font-size: 11px; font-family: var(--mono);
+      background: var(--surf2); border: 1px solid var(--bdr);
+      border-radius: 3px; padding: 0 5px; color: var(--muted);
+    }
+    .alert-count.has-alerts { background: rgba(196,75,43,.12); border-color: rgba(196,75,43,.3); color: var(--fault); }
+
+    .alert-scroll {
+      flex: 1; overflow-x: auto; overflow-y: hidden;
+      display: flex; align-items: stretch;
+      padding: 10px 20px; gap: 10px;
+    }
+    .alert-item {
+      flex-shrink: 0;
+      background: rgba(196,75,43,.07);
+      border: 1px solid rgba(196,75,43,.2);
+      border-radius: var(--radius);
+      padding: 8px 12px; min-width: 190px;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .alert-dev  { font-size: 11px; font-weight: 600; color: var(--fault); }
+    .alert-msg  { font-size: 11px; color: var(--txt); opacity: .8; }
+    .alert-time { font-size: 10px; color: var(--dim); font-family: var(--mono); }
+    .alert-none { font-size: 12px; color: var(--dim); align-self: center; }
+
+    /* ─── Scrollbar ───────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--bdr); border-radius: 2px; }
+
+    .sync-pill {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 500;
+      padding: 3px 9px; border-radius: 4px;
+      border: 1px solid var(--bdr);
+      color: var(--muted);
+      background: var(--surf2);
+      transition: background .4s, border-color .4s, color .4s;
+      font-family: var(--mono);
+    }
+    .sync-pill .sp-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--dim); flex-shrink: 0;
+      transition: background .4s;
+    }
+    .sync-pill.sp-live     { color: var(--ok);   border-color: rgba(26,138,56,.25);  background: rgba(26,138,56,.06);  }
+    .sync-pill.sp-live .sp-dot     { background: var(--ok); }
+    .sync-pill.sp-buffering{ color: var(--warn); border-color: rgba(154,96,16,.3);   background: rgba(154,96,16,.07);  }
+    .sync-pill.sp-buffering .sp-dot { background: var(--warn); }
+    .sync-pill.sp-replaying{ color: #1a60a0;     border-color: rgba(26,96,160,.3);   background: rgba(26,96,160,.07);  }
+    .sync-pill.sp-replaying .sp-dot { background: #1a60a0; }
+    .sync-pill.sp-stale    { color: var(--dim);  }
+
+    @media (max-width: 860px) {
+      .sidebar { width: 220px; }
+      .chart-pane { grid-template-columns: 1fr; }
+      .chart-cell + .chart-cell { border-left: none; border-top: 1px solid var(--bdr); }
+    }
+    @media (max-width: 640px) {
+      body { overflow: auto; height: auto; }
+      .body { flex-direction: column; overflow: visible; }
+      .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--bdr); }
+      .chart-pane { height: 400px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .dev-card.sweeping::after { transition: none; }
+      .chart-empty-spin { animation: none; border-top-color: var(--dim); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────── -->
+<header class="hdr">
+  <div class="hdr-left">
+    <div class="hdr-icon">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="#0e0e10" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    </div>
+    <span class="hdr-title">Ledger</span>
+    <span class="hdr-sep">/</span>
+    <span class="hdr-sub">Gateway Monitor</span>
+  </div>
+  <div class="hdr-right">
+    <span class="sim-note">Pumping Station Alpha</span>
+    
+    <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙 Dark Mode</button>
+    <div class="sync-pill" id="sync-pill">
+      <span class="sp-dot"></span>
+      <span id="sync-label">Waiting</span>
+    </div>
+    <span id="clock">—</span>
+    <div class="conn">
+      <span class="conn-dot" id="conn-dot"></span>
+      <span id="conn-txt">Connecting</span>
+    </div>
+  </div>
+</header>
+
+<!-- ── Body ─────────────────────────────────────────────────── -->
+<div class="body">
+
+  <!-- Sidebar: device cards -->
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+      <div class="sidebar-heading">Devices</div>
+      <div id="dev-list">
+        <div class="sidebar-empty">
+          Start the simulators and<br>src/main.py to see devices.
+        </div>
+      </div>
+    </div>
+    <div class="sb-tools">
+      <div class="sidebar-heading">Session Tools</div>
+      <div class="recorder" id="recorder">
+        <button class="rec-btn" id="rec-btn" onclick="toggleRecord()">
+          <span class="rec-dot" id="rec-dot"></span>
+          <span id="rec-lbl">Record Data</span>
+        </button>
+        <span class="rec-timer" id="rec-timer">00:00:00</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main: charts + alerts -->
+  <div class="main">
+
+    <div class="chart-pane">
+      <div class="chart-cell">
+        <div class="chart-hd">
+          <span class="chart-title">Electrical</span>
+          <span class="chart-group-tag">voltage · current · power</span>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-empty" id="elec-empty">
+            <div class="chart-empty-spin"></div>
+            <span>Waiting for data</span>
+          </div>
+          <canvas id="chart-elec" style="display:none"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-cell">
+        <div class="chart-hd">
+          <span class="chart-title">Process</span>
+          <span class="chart-group-tag">pressure · flow · level · temp</span>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-empty" id="proc-empty">
+            <div class="chart-empty-spin"></div>
+            <span>Waiting for data</span>
+          </div>
+          <canvas id="chart-proc" style="display:none"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert-strip">
+      <div class="alert-hd">
+        <span class="alert-hd-title">Alerts</span>
+        <span class="alert-count" id="alert-count">0</span>
+      </div>
+      <div class="alert-scroll" id="alert-scroll">
+        <span class="alert-none" id="alert-none">No alerts</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+<script>
+/* ── Config ─────────────────────────────────────────────────── */
+const BROKER  = 'ws://broker.hivemq.com:8000/mqtt';
+const TOPIC   = 'opendaq_rohit/gateway/#';
+const TOPIC_STATUS = 'opendaq_rohit/gateway/_status';
+const CID     = 'ledger_' + Math.random().toString(36).slice(2, 9);
+const HIST    = 60;
+const STATUS_STALE_MS = 20_000;  // treat as stale if no status for 20s
+
+const ELEC_FIELDS = new Set(['voltage','current','active_power','frequency','power_factor']);
+const PROC_FIELDS = new Set(['pressure','flow_rate','tank_level','temperature']);
+
+/* Color per field — amber family for electrical, teal family for process */
+const FIELD_COLOR = {
+  voltage:      '#9a7810',
+  current:      '#4a8010',
+  active_power: '#b04010',
+  frequency:    '#707010',
+  power_factor: '#a08010',
+  pressure:     '#1f7060',
+  flow_rate:    '#1a5a90',
+  tank_level:   '#1a6880',
+  temperature:  '#903010',
+};
+
+/* ── State ──────────────────────────────────────────────────── */
+const devices  = {};   /* { name: { fields: { name: {value,unit,alert} }, lastMs } } */
+const prevVal  = {};
+let   alertN   = 0;
+const charts   = {};
+
+/* ── CSV Recorder ───────────────────────────────────────────── */
+let isRecording = false;
+let recStartTime = 0;
+let recBuffer = [];
+let recInterval = null;
+
+function toggleRecord() {
+  if (isRecording) stopRecording();
+  else startRecording();
+}
+
+function startRecording() {
+  isRecording = true;
+  recStartTime = Date.now();
+  recBuffer = [["Timestamp (UTC)", "Device", "Field", "Value", "Unit"]]; // CSV Header
+  
+  document.getElementById('recorder').classList.add('recording');
+  document.getElementById('rec-lbl').textContent = "Stop & Save";
+  recInterval = setInterval(updateRecTimer, 1000);
+  updateRecTimer();
+}
+
+function stopRecording() {
+  isRecording = false;
+  clearInterval(recInterval);
+  
+  document.getElementById('recorder').classList.remove('recording');
+  document.getElementById('rec-lbl').textContent = "Record";
+  document.getElementById('rec-timer').textContent = "00:00:00";
+
+  if (recBuffer.length > 1) {
+    const csvContent = recBuffer.map(row => row.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ledger_export_${new Date().toISOString().slice(0,19).replace(/[:T]/g,"_")}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+  recBuffer = [];
+}
+
+function updateRecTimer() {
+  const s = Math.floor((Date.now() - recStartTime) / 1000);
+  const hh = String(Math.floor(s / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  document.getElementById('rec-timer').textContent = `${hh}:${mm}:${ss}`;
+}
+
+/* ── DOM Init ───────────────────────────────────────────────── */
+const clockEl = document.getElementById('clock');
+function tick() {
+  const d = new Date();
+  const dd = d.toLocaleDateString('en-GB', {day:'2-digit',month:'short'});
+  const tt = d.toLocaleTimeString('en-GB', {hour12:false});
+  clockEl.textContent = dd + '  ' + tt;
+}
+tick(); setInterval(tick, 1000);
+
+/* ── Age labels ─────────────────────────────────────────────── */
+setInterval(() => {
+  const now = Date.now();
+  Object.entries(devices).forEach(([name, dev]) => {
+    const el = document.getElementById('age_' + safeid(name));
+    if (el) {
+      const s = Math.floor((now - dev.lastMs) / 1000);
+      el.textContent = s < 2 ? 'just now' : s + 's ago';
+    }
+  });
+}, 1000);
+
+/* ── MQTT ───────────────────────────────────────────────────── */
+const client = mqtt.connect(BROKER, { clientId: CID, clean: true, reconnectPeriod: 4000 });
+client.on('connect',   () => { setConn('live','Connected'); client.subscribe([TOPIC, TOPIC_STATUS], {qos:0}); });
+client.on('reconnect', () => setConn('','Reconnecting'));
+client.on('offline',   () => setConn('error','Offline'));
+client.on('error',     () => setConn('error','Error'));
+client.on('message', (topic, buf) => {
+  try {
+    const payload = JSON.parse(buf.toString());
+    if (topic === TOPIC_STATUS) { onStatus(payload); return; }
+    onMsg(payload);
+  } catch(_) {}
+});
+
+/* ── Sync status ────────────────────────────────────────────── */
+let lastStatusMs = 0;
+
+function onStatus(s) {
+  lastStatusMs = Date.now();
+  const n = s.buffered_count || 0;
+  const r = s.replaying_count || 0;
+  if (s.state === 'live' && n === 0) {
+    setSyncState('sp-live', '✓ synced');
+  } else if (s.state === 'replaying') {
+    setSyncState('sp-replaying', `↺ replaying ${r}`);
+  } else if (s.state === 'buffering' || n > 0) {
+    setSyncState('sp-buffering', `⬡ queued ${n}`);
+  } else {
+    setSyncState('sp-live', '✓ synced');
+  }
+}
+
+function setSyncState(cls, label) {
+  const pill  = document.getElementById('sync-pill');
+  const lbl   = document.getElementById('sync-label');
+  pill.className = 'sync-pill ' + cls;
+  lbl.textContent = label;
+}
+
+// Stale detection: if no status arrives in STATUS_STALE_MS, show as stale
+setInterval(() => {
+  if (lastStatusMs > 0 && Date.now() - lastStatusMs > STATUS_STALE_MS) {
+    setSyncState('sp-stale', '— no heartbeat');
+  }
+}, 5000);
+
+function setConn(cls, label) {
+  const dot = document.getElementById('conn-dot');
+  const txt = document.getElementById('conn-txt');
+  dot.className = 'conn-dot' + (cls ? ' ' + cls : '');
+  txt.textContent = label;
+  txt.style.color = cls === 'live' ? 'var(--ok)' : cls === 'error' ? 'var(--fault)' : 'var(--muted)';
+}
+
+/* ── Message handler ────────────────────────────────────────── */
+function onMsg(payload) {
+  const dev   = payload.device_name;
+  const field = payload.field_name;
+  const val   = payload.value;
+  const unit  = payload.unit;
+  const ts    = payload.timestamp_utc;
+  const isAlert = payload.alert;
+  const aMsg  = payload.alert_message;
+
+  if (isRecording) {
+    recBuffer.push([ts, `"${dev}"`, field, val, `"${unit}"`]);
+  }
+
+  if (!devices[dev]) {devices[dev] = { fields: {}, lastMs: 0 };}
+  
+  const fstate = devices[dev].fields[field] || { value: val, unit, alert: isAlert, min: val, max: val };
+  fstate.value = val;
+  fstate.unit = unit;
+  fstate.alert = isAlert;
+  if (val < fstate.min) fstate.min = val;
+  if (val > fstate.max) fstate.max = val;
+  devices[dev].fields[field] = fstate;
+  devices[dev].lastMs = Date.now();
+
+  renderDevice(dev);
+  pushChart(field, dev, val);
+  if (isAlert && aMsg) addAlert(dev, field, aMsg);
+}
+
+/* ── Device cards ───────────────────────────────────────────── */
+function safeid(s) { return s.replace(/[^a-z0-9]/gi, '_'); }
+
+function renderDevice(devName) {
+  const sid = safeid(devName);
+  const dev  = devices[devName];
+  let   card = document.getElementById('dev_' + sid);
+
+  /* Remove placeholder */
+  const placeholder = document.querySelector('#dev-list .sidebar-empty');
+  if (placeholder) placeholder.remove();
+
+  if (!card) {
+    card = document.createElement('div');
+    card.id = 'dev_' + sid;
+    card.className = 'dev-card';
+    card.innerHTML = `
+      <div class="dev-card-head">
+        <div class="dev-card-name">
+          <span class="dev-status-dot"></span>
+          ${devName}
+        </div>
+        <span class="dev-age" id="age_${sid}">—</span>
+      </div>
+      <div class="dev-fields" id="fields_${sid}"></div>`;
+    document.getElementById('dev-list').appendChild(card);
+  }
+
+  /* Rebuild fields grid */
+  const grid = document.getElementById('fields_' + sid);
+  grid.innerHTML = Object.entries(dev.fields).map(([f, fstate]) => {
+    const key = devName + '/' + f;
+    const { value, unit, min, max, alert: a } = fstate;
+    const changed = prevVal[key] !== undefined && Math.abs(value - prevVal[key]) > 0.005;
+    prevVal[key] = value;
+    const cls = a ? 'is-alert' : (changed ? 'changed' : '');
+    return `<div class="field-cell">
+      <div class="f-hdr">
+        <span class="f-name">${f.replace(/_/g, ' ')}</span>
+        <button class="snap-btn" title="Snapshot Chart" onclick="snapChart('${grpFor(f)}')">📷</button>
+      </div>
+      <div class="f-val ${cls}">${fmtVal(value)}<span class="f-unit">${unit}</span></div>
+      <div class="f-minmax">▼ ${fmtVal(min)} &nbsp; ▲ ${fmtVal(max)}</div>
+    </div>`;
+  }).join('');
+
+  /* Trigger poll sweep */
+  card.classList.remove('sweeping');
+  void card.offsetWidth;  /* reflow to restart transition */
+  card.classList.add('sweeping');
+  setTimeout(() => card.classList.remove('sweeping'), 600);
+}
+
+/* ── Charts ─────────────────────────────────────────────────── */
+const CHART_OPT = {
+  animation: { duration: 350 },
+  responsive: true, maintainAspectRatio: false,
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: {
+      labels: {
+        color: '#6a6a78',
+        font: { size: 10, family: "'IBM Plex Sans', system-ui" },
+        boxWidth: 8, boxHeight: 8, padding: 14,
+        usePointStyle: true,
+      }
+    },
+    tooltip: {
+      backgroundColor: '#1a1a1e',
+      borderColor: '#e2e2de', borderWidth: 1,
+      titleColor: '#f0f0ee', bodyColor: '#b0b0be',
+      padding: 10, cornerRadius: 6,
+      callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtVal(ctx.parsed.y)}` },
+    },
+  },
+  scales: {
+    x: {
+      ticks: { color: '#b0b0be', font: { size: 9 }, maxTicksLimit: 7 },
+      grid:  { color: 'rgba(0,0,0,0.05)' },
+      border: { color: '#e2e2de' },
+    },
+    y: {
+      ticks: { color: '#6a6a78', font: { size: 10 } },
+      grid:  { color: 'rgba(0,0,0,0.06)' },
+      border: { color: '#e2e2de' },
+    },
+  },
+};
+
+function getChart(group) {
+  if (charts[group]) return charts[group];
+  const cvId = 'chart-' + group;
+  const emId = group + '-empty';
+  document.getElementById(emId).style.display = 'none';
+  const cv = document.getElementById(cvId);
+  cv.style.display = 'block';
+  const c = new Chart(cv.getContext('2d'), {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: CHART_OPT,
+  });
+  charts[group] = c;
+  return c;
+}
+
+function pushChart(field, dev, value) {
+  const grp = ELEC_FIELDS.has(field) ? 'elec'
+             : PROC_FIELDS.has(field) ? 'proc' : null;
+  if (!grp) return;
+
+  const chart = getChart(grp);
+  const label = new Date().toLocaleTimeString('en-GB', { hour12: false });
+  const key   = `${dev} / ${field.replace(/_/g,' ')}`;
+  const color = FIELD_COLOR[field] || '#7a7a8c';
+
+  let ds = chart.data.datasets.find(d => d.label === key);
+  if (!ds) {
+    ds = {
+      label: key,
+      data: [],
+      borderColor: color,
+      backgroundColor: 'transparent',
+      borderWidth: 2.2,
+      pointRadius: 0,
+      pointHoverRadius: 3,
+      pointHoverBackgroundColor: color,
+      stepped: 'before',
+    };
+    chart.data.datasets.push(ds);
+  }
+
+  const labels = chart.data.labels;
+  if (!labels.length || labels[labels.length - 1] !== label) labels.push(label);
+  if (labels.length > HIST) labels.shift();
+  ds.data.push(value);
+  if (ds.data.length > HIST) ds.data.shift();
+
+  chart.update('none');
+}
+
+/* ── Alerts ─────────────────────────────────────────────────── */
+function addAlert(dev, field, msg) {
+  document.getElementById('alert-none')?.remove();
+  
+  const id = `alert_${dev}_${field}`.replace(/\W/g,'_');
+  const existing = document.getElementById(id);
+  if (existing && !existing.classList.contains('acked')) return; // Don't spam un-acked alerts
+
+  if (!existing) {
+    alertN++;
+    const countEl = document.getElementById('alert-count');
+    countEl.textContent = alertN;
+    countEl.classList.add('has-alerts');
+  }
+
+  const scroll = document.getElementById('alert-scroll');
+  const item = document.createElement('div');
+  item.className = 'alert-item';
+  item.id = id;
+  item.title = "Click to Acknowledge";
+  item.style.cursor = "pointer";
+  item.innerHTML = `
+    <span class="alert-dev">${dev} / ${field.replace(/_/g,' ')}</span>
+    <span class="alert-msg">${msg}</span>
+    <span class="alert-time">${new Date().toLocaleTimeString('en-GB',{hour12:false})}</span>`;
+  
+  item.onclick = () => {
+    item.classList.add('acked');
+    item.style.opacity = '0.5';
+    item.style.filter = 'grayscale(1)';
+    item.innerHTML += `<span style="margin-left:auto; font-size:10px; color:var(--muted)">[ACK]</span>`;
+    alertN = Math.max(0, alertN - 1);
+    const countEl = document.getElementById('alert-count');
+    countEl.textContent = alertN;
+    if (alertN === 0) countEl.classList.remove('has-alerts');
+  };
+
+  scroll.prepend(item);
+  while (scroll.querySelectorAll('.alert-item').length > 50)
+    scroll.removeChild(scroll.lastChild);
+}
+
+/* ── Utilities ──────────────────────────────────────────────── */
+function fmtVal(v) {
+  if (v == null) return '—';
+  const a = Math.abs(v);
+  if (a >= 10000) return v.toFixed(0);
+  if (a >= 1000)  return v.toFixed(1);
+  if (a >= 10)    return v.toFixed(2);
+  return v.toFixed(3);
+}
+/* ── Features ────────────────────────────────────────────────── */
+function grpFor(field) {
+  return ELEC_FIELDS.has(field) ? 'elec' : PROC_FIELDS.has(field) ? 'proc' : null;
+}
+
+function snapChart(grp) {
+  if (!charts[grp]) return;
+  const canvas = charts[grp].canvas;
+  const url = canvas.toDataURL("image/png");
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ledger_chart_${grp}_${new Date().getTime()}.png`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+let isDark = false;
+function toggleTheme() {
+  isDark = !isDark;
+  document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.innerHTML = isDark ? '☀️ Light Mode' : '🌙 Dark Mode';
+  
+  const tickColor = isDark ? '#7a7a8c' : '#6a6a78';
+  const gridColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
+  const bdrColor = isDark ? '#34343c' : '#e2e2de';
+  const tooltipBg = isDark ? '#1a1a1e' : '#ffffff';
+  
+  Object.values(charts).forEach(c => {
+     c.options.scales.x.ticks.color = tickColor;
+     c.options.scales.y.ticks.color = tickColor;
+     c.options.scales.x.grid.color = gridColor;
+     c.options.scales.y.grid.color = gridColor;
+     c.options.scales.x.border.color = bdrColor;
+     c.options.scales.y.border.color = bdrColor;
+     c.options.plugins.tooltip.backgroundColor = tooltipBg;
+     c.options.plugins.legend.labels.color = tickColor;
+     c.update('none');
+  });
+}
+
+Chart.register({
+  id: 'customCanvasBackgroundColor',
+  beforeDraw: (chart) => {
+    const ctx = chart.canvas.getContext('2d');
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-over';
+    const bg = getComputedStyle(document.body).getPropertyValue('--bg').trim() || '#ffffff';
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, chart.width, chart.height);
+    ctx.restore();
+  }
+});
+</script>
+</body>
+</html>

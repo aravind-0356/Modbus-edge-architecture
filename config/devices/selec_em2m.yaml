@@ -1,0 +1,125 @@
+# config/devices/selec_em2m.yaml
+#
+# Device profile for the Selec EM2M-1P single-phase energy meter.
+#
+# SOURCE: Selec EM2M-1P Instruction Manual, Doc. OP639-V03, Page 2.
+# Register addresses and data structure confirmed from the "MODBUS REGISTER
+# ADDRESSES LIST" table in that document. All addresses below are taken
+# directly from the manual — not derived or estimated.
+#
+# Register type: INPUT REGISTERS (function code 0x04, 3xxxx addresses in
+#   1-based Modbus notation). The manual lists these under the 30000-series.
+#   0x00 hex = register 30001 in 1-based = address 0 in 0-based (as used here).
+#
+# Data structure: "Float (Swapped)" per the manual heading:
+#   "Readable parameters for Communication [Length (Register): 2;
+#    Data Structure: Float (Swapped)]"
+#   This maps to byte_order: big_endian_word_swap in this project.
+#   Meaning: each value occupies 2 consecutive 16-bit registers.
+#   Register[0] = low word (0xE979 for 123.456),
+#   Register[1] = high word (0x42F6 for 123.456).
+#   Bytes within each register are big-endian.
+#
+# Byte order VERIFICATION NOTE:
+#   Before trusting readings from a real device, independently confirm the
+#   byte_order is correct: read the voltage register while the meter's LCD
+#   also displays the voltage, and verify that big_endian_word_swap in
+#   src/byte_order.py reproduces the same value. Do not skip this step.
+#
+# Slave ID: configurable via front-panel DIP switches (1–255). Default = 1.
+# Baud rate: 9600 bps default (configurable to 19200).
+# The RS-485 to TCP gateway (e.g. USR-DR404) sits between this meter and
+# the network; this project speaks Modbus TCP to the gateway, not RTU to
+# the meter directly.
+#
+# sim_default values: SIMULATED. These are plausible single-phase Indian
+# grid values used for simulator testing only — they are NOT readings from
+# a real device.
+
+device_name: "Selec EM2M-1P"
+slave_id: 1
+poll_interval_seconds: 5
+register_type: "input"     # FC=0x04 (Read Input Registers); use FC=0x03 for holding registers
+
+registers:
+  - name: "voltage"
+    address: 0x00          # Manual p.2: "Voltage L-N", hex address 0x00, decimal 30000
+    register_count: 2
+    data_type: "float32"
+    byte_order: "big_endian_word_swap"   # Manual: "Float (Swapped)"
+    scale: 1.0
+    unit: "V"
+    alert_range: [200.0, 250.0]
+    sim_default: 230.0     # SIMULATED — typical single-phase mains voltage, India
+    sim_drift_pct: 2.0
+
+  - name: "current"
+    address: 0x02          # Manual p.2: "Current", hex address 0x02, decimal 30002
+    register_count: 2
+    data_type: "float32"
+    byte_order: "big_endian_word_swap"
+    scale: 1.0
+    unit: "A"
+    alert_range: [0.0, 100.0]
+    sim_default: 5.0       # SIMULATED
+    sim_drift_pct: 10.0
+
+  - name: "active_power"
+    address: 0x04          # Manual p.2: "Active Power", hex address 0x04, decimal 30004
+    register_count: 2
+    data_type: "float32"
+    byte_order: "big_endian_word_swap"
+    scale: 1.0
+    unit: "W"
+    alert_range: [0.0, 23000.0]
+    sim_default: 1150.0    # SIMULATED — roughly 230 V × 5 A
+    sim_drift_pct: 8.0
+
+  - name: "reactive_power"
+    address: 0x06          # Manual p.2: "Reactive Power", hex address 0x06, decimal 30006
+    register_count: 2
+    data_type: "float32"
+    byte_order: "big_endian_word_swap"
+    scale: 1.0
+    unit: "VAr"
+    alert_range: [-5000.0, 5000.0]
+    sim_default: 200.0     # SIMULATED
+    sim_drift_pct: 15.0
+
+  - name: "apparent_power"
+    address: 0x08          # Manual p.2: "Apparent Power", hex address 0x08, decimal 30008
+    register_count: 2
+    data_type: "float32"
+    byte_order: "big_endian_word_swap"
+    scale: 1.0
+    unit: "VA"
+    alert_range: [0.0, 23000.0]
+    sim_default: 1167.0    # SIMULATED
+    sim_drift_pct: 8.0
+
+  - name: "power_factor"
+    address: 0x1C          # Manual p.2: "Power Factor", hex address 0x1C, decimal 30028
+    register_count: 2
+    data_type: "float32"
+    byte_order: "big_endian_word_swap"
+    scale: 1.0
+    unit: ""               # dimensionless (0.0 to 1.0)
+    alert_range: [0.7, 1.0]
+    sim_default: 0.92      # SIMULATED
+    sim_drift_pct: 3.0
+
+  - name: "frequency"
+    address: 0x1E          # Manual p.2: "Frequency", hex address 0x1E, decimal 30030
+    register_count: 2
+    data_type: "float32"
+    byte_order: "big_endian_word_swap"
+    scale: 1.0
+    unit: "Hz"
+    alert_range: [49.0, 51.0]
+    sim_default: 50.0      # SIMULATED — Indian grid frequency
+    sim_drift_pct: 0.5
+
+simulator:
+  host: "127.0.0.1"
+  port: 5020
+  update_interval_seconds: 2

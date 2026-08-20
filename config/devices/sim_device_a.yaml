@@ -1,0 +1,57 @@
+# config/devices/sim_device_a.yaml
+#
+# Simulated Device A — fictional "Vendor Alpha" industrial sensor.
+# ALL DATA IS SIMULATED. This profile exists to demonstrate that the
+# data layer handles one byte_order mode correctly. Compare with
+# sim_device_b.yaml which uses a different byte_order and register layout.
+#
+# Used by:
+#   simulators/modbus_slave_sim.py --config config/devices/sim_device_a.yaml
+#   src/main.py --config-dir config/devices/
+#
+# byte_order: big_endian_word_swap
+# Registers start at 0x0000
+# Slave ID: 2, Port: 5021
+
+device_name: "Panel Meter — Bay 1"
+slave_id: 2
+poll_interval_seconds: 3
+
+registers:
+  - name: "voltage"
+    address: 0x0000
+    register_count: 2
+    data_type: "float32"
+    byte_order: "big_endian_word_swap"
+    scale: 1.0
+    unit: "V"
+    alert_range: [210.0, 240.0]
+    sim_default: 225.0    # SIMULATED
+    sim_drift_pct: 3.0
+
+  - name: "current"
+    address: 0x0002
+    register_count: 2
+    data_type: "float32"
+    byte_order: "big_endian_word_swap"
+    scale: 1.0
+    unit: "A"
+    alert_range: [0.0, 20.0]
+    sim_default: 8.5      # SIMULATED
+    sim_drift_pct: 12.0
+
+  - name: "temperature"
+    address: 0x0004
+    register_count: 2
+    data_type: "float32"
+    byte_order: "big_endian_word_swap"
+    scale: 1.0
+    unit: "°C"
+    alert_range: [0.0, 80.0]
+    sim_default: 42.0     # SIMULATED — plausible motor/panel temperature
+    sim_drift_pct: 5.0
+
+simulator:
+  host: "127.0.0.1"
+  port: 5021
+  update_interval_seconds: 2

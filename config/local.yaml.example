@@ -1,0 +1,18 @@
+# config/local.yaml.example
+#
+# Copy this file to config/local.yaml and fill in your values.
+# config/local.yaml is gitignored — never commit it.
+#
+# If using the simulator (simulators/modbus_slave_sim.py), the defaults below
+# match the simulator's default bind address and ports. Adjust if you changed them.
+
+gateway:
+  host: "127.0.0.1"   # IP of the Modbus TCP gateway (or 127.0.0.1 for simulator)
+  port: 5020           # TCP port (simulator default; real USR-DR404 default is 502)
+
+mqtt:
+  host: "broker.hivemq.com"   # HiveMQ public broker — DEMO ONLY, not private
+  port: 1883
+  # username: ""              # uncomment if your broker requires auth
+  # password: ""
+  # tls: false                # set true + configure certs for a production broker

@@ -1,0 +1,61 @@
+# config/devices/sim_device_b.yaml
+#
+# Simulated Device B — fictional "Vendor Beta" industrial sensor.
+# ALL DATA IS SIMULATED. This profile deliberately uses a DIFFERENT
+# byte_order and register layout from sim_device_a.yaml to demonstrate
+# that the normalization layer handles multi-vendor differences correctly.
+#
+# Key differences vs. sim_device_a.yaml:
+#   - byte_order: little_endian  (vs. big_endian_word_swap in Device A)
+#   - Different register addresses
+#   - Different scale factors (pressure stored as integer × 0.1 bar)
+#   - Different slave ID and port
+#
+# Used by:
+#   simulators/modbus_slave_sim.py --config config/devices/sim_device_b.yaml
+#   src/main.py --config-dir config/devices/
+#
+# Slave ID: 3, Port: 5022
+
+device_name: "Pipeline Monitor — Line 1"
+slave_id: 3
+poll_interval_seconds: 5
+
+registers:
+  - name: "pressure"
+    address: 0x0010        # deliberate non-zero start to show address flexibility
+    register_count: 2
+    data_type: "float32"
+    byte_order: "little_endian"   # different from Device A
+    scale: 1.0
+    unit: "bar"
+    alert_range: [0.5, 8.0]
+    sim_default: 3.5      # SIMULATED
+    sim_drift_pct: 8.0
+
+  - name: "flow_rate"
+    address: 0x0012
+    register_count: 2
+    data_type: "float32"
+    byte_order: "little_endian"
+    scale: 1.0
+    unit: "L/min"
+    alert_range: [0.0, 100.0]
+    sim_default: 45.0     # SIMULATED
+    sim_drift_pct: 15.0
+
+  - name: "tank_level"
+    address: 0x0014
+    register_count: 2
+    data_type: "float32"
+    byte_order: "little_endian"
+    scale: 1.0
+    unit: "%"
+    alert_range: [10.0, 95.0]
+    sim_default: 72.0     # SIMULATED — tank percentage full
+    sim_drift_pct: 4.0
+
+simulator:
+  host: "127.0.0.1"
+  port: 5022
+  update_interval_seconds: 3

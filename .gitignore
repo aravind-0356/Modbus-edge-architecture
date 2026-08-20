@@ -1,0 +1,36 @@
+# .gitignore
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local config with credentials/IPs — never commit these
+config/local.yaml
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Environment files
+.env
+*.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and temporary outputs
+*.log
+logs/
+
+# SQLite buffer databases (runtime state, not source)
+*.db
+*.sqlite
