@@ -3,9 +3,8 @@ tests/test_byte_order.py
 -------------------------
 Unit tests for src/byte_order.py.
 
-Per AGENTS.md requirements: every function in src/byte_order.py must have a
-corresponding unit test with a known input/output pair sourced from real
-datasheet data or IEEE-754 arithmetic — not fabricated numbers.
+Every function in src/byte_order.py is tested with a known input/output pair 
+sourced from real datasheet data or IEEE-754 arithmetic.
 
 Source for all test values below: Python's struct module implements IEEE-754
 binary32 arithmetic exactly. All expected register values are derived from
@@ -360,16 +359,14 @@ class TestBigEndianWordSwap:
 # Cross-mode tests — the most important safety tests
 # A wrong byte-order assumption produces a plausible-looking wrong value,
 # not an error. These tests verify that using the wrong mode gives a DIFFERENT
-# result from the correct one, detecting the kind of silent failure described
-# in SKILLS.md.
+# result from the correct one, detecting potential silent failures.
 # ===========================================================================
 
 class TestCrossModeSilentFailureDetection:
     """Verify that mixing up byte-order modes gives wrong results.
 
-    This is the core safety property from SKILLS.md:
-    'A wrong byte-order assumption does not throw an error —
-     it produces a plausible-looking but wrong number.'
+    A wrong byte-order assumption does not throw an error —
+    it produces a plausible-looking but wrong number.
     """
 
     def test_big_endian_registers_wrong_if_decoded_as_word_swap(self):
@@ -494,7 +491,7 @@ class TestConstants:
         assert set(BYTE_ORDER_HANDLERS.keys()) == SUPPORTED_BYTE_ORDERS
 
     def test_expected_modes_present(self):
-        """The three modes documented in WALKTHROUGH.md Phase 2 must be present."""
+        """The three standard modes must be present."""
         assert "big_endian"           in SUPPORTED_BYTE_ORDERS
         assert "little_endian"        in SUPPORTED_BYTE_ORDERS
         assert "big_endian_word_swap" in SUPPORTED_BYTE_ORDERS

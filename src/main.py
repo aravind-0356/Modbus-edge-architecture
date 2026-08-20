@@ -3,7 +3,7 @@ src/main.py
 -----------
 Orchestrates the full polling → buffer → alert-check → publish loop.
 
-Key design rules enforced here (AGENTS.md / SKILLS.md):
+Design Requirements:
 - Each device's poll+publish cycle is wrapped in its own try/except.
   One failing device MUST NOT stop polling for the others.
 - Failure of one device is logged with device name and timestamp.
@@ -235,7 +235,7 @@ def _poll_one_device(
 ) -> None:
     """Poll one device, buffer readings, and dispatch alerts.
 
-    Per AGENTS.md: all exceptions are caught here so one device's failure
+    Implementation Note: all exceptions are caught here so one device's failure
     does not stop polling for other devices. The failure is logged with
     device name and timestamp.
     """

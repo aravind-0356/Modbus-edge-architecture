@@ -22,7 +22,7 @@ Supported modes
                            Register[0] = low word, Register[1] = high word.
                            Common in Selec energy meters and some other vendors.
 
-Testing requirement (AGENTS.md)
+Testing Requirements
 --------------------------------
 Every function here must have a corresponding unit test with a known
 input/output pair sourced from real datasheet data or IEEE-754 arithmetic —

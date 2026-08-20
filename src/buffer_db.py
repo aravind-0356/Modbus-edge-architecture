@@ -3,7 +3,7 @@ src/buffer_db.py
 -----------------
 SQLite local buffering and replay-on-reconnect.
 
-Design rules (SKILLS.md):
+Design Requirements:
 - Buffer-then-publish: every reading is written here FIRST before any
   publish attempt. Only marked published after confirmed PUBACK (QoS 1).
 - Replay preserves original order (ORDER BY timestamp_utc) and original

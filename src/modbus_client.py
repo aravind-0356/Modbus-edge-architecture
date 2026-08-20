@@ -8,7 +8,7 @@ Never implements RTU framing — that's the gateway's job (SKILLS.md).
 Supports both holding registers (FC=0x03) and input registers (FC=0x04),
 selected via the profile's 'register_type' field.
 
-Per AGENTS.md: failures in one device's poll cycle must not affect others.
+Implementation Note: failures in one device's poll cycle must not affect others.
 This module raises exceptions on failure; the caller (main.py) wraps each
 device in its own try/except.
 """

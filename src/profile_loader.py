@@ -3,7 +3,7 @@ src/profile_loader.py
 ----------------------
 Loads and validates device YAML profiles from config/devices/*.yaml.
 
-Design contract (SKILLS.md / AGENTS.md):
+Design Requirements:
 - Fail loudly (raise, never silently default) on invalid or incomplete profiles.
   A bad profile must be rejected at startup, not discovered mid-poll-cycle.
 - byte_order must be one of the explicitly supported values.

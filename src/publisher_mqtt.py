@@ -3,7 +3,7 @@ src/publisher_mqtt.py
 ----------------------
 MQTT publisher for normalized readings.
 
-Design rules (SKILLS.md / AGENTS.md):
+Design Requirements:
 - QoS 1 (at-least-once): required because replay logic depends on knowing
   whether a publish actually succeeded. QoS 0 (fire-and-forget) is not
   sufficient here.
