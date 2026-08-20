@@ -34,3 +34,10 @@ logs/
 # SQLite buffer databases (runtime state, not source)
 *.db
 *.sqlite
+
+# Internal development notes and manuals
+AGENTS.md
+SKILLS.md
+frontend.md
+PROJECT_STATUS.md
+*.pdf
