@@ -21,7 +21,7 @@ If the Selec meter shows the motor pulling maximum current, but the Advantech mo
 
 ## The problem this software layer solves
 
-Commercial Modbus RTU-to-TCP gateways (e.g. USR-DR404, ~₹2,400) do one thing exceptionally well: they convert RS-485 serial frames into Modbus TCP packets that a networked host can reach. They do this reliably, cheaply, and without any programming. This project does not compete with that hardware — it treats it as a purchased component.
+Commercial Modbus RTU-to-TCP gateways (such as the USR-DR404) do one thing exceptionally well: they convert RS-485 serial frames into Modbus TCP packets that a networked host can reach. They do this reliably, efficiently, and without any programming. This project does not compete with that hardware — it treats it as a purchased component.
 
 What the gateway *cannot* do:
 

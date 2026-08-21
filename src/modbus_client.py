@@ -4,7 +4,7 @@ src/modbus_client.py
 Modbus TCP polling client.
 
 Speaks Modbus TCP to the gateway (which handles RTU↔TCP conversion).
-Never implements RTU framing — that's the gateway's job (SKILLS.md).
+Never implements RTU framing — that is the hardware gateway's responsibility.
 Supports both holding registers (FC=0x03) and input registers (FC=0x04),
 selected via the profile's 'register_type' field.
 
